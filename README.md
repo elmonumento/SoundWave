@@ -1,82 +1,49 @@
 # SoundWave
 
-SoundWave is a desktop music-streaming project built from the supplied
-architecture brief. The repository contains two Maven modules:
-
-- `backend`: Spring Boot REST API, JWT authentication, MySQL and Flyway.
-- `desktop`: JavaFX/FXML client that signs in, browses the catalogue and plays
-  audio URLs supplied by the API.
+SoundWave is a modern web music library built with Next.js, React, TypeScript,
+Drizzle ORM and the MySQL server included with XAMPP.
 
 ## Requirements
 
-- JDK 21 or newer (the project targets Java 21).
-- Maven 3.9 or newer.
-- MySQL 8 or newer (XAMPP MySQL/MariaDB is suitable for local development).
+- Node.js 20.9 or newer.
+- XAMPP with MySQL/MariaDB.
 
-## Create the database and start the API
+## Run locally
 
-Start MySQL in the XAMPP Control Panel. The project uses the database named
-`soundwave` (it has already been created on this machine; on another machine,
-create it in phpMyAdmin with the `utf8mb4_unicode_ci` collation). Flyway creates
-the tables on the first API startup. The Maven Wrapper downloads Maven on first
-use, so a separate Maven install is not required. Open PowerShell in this folder
-and use the standard XAMPP `root` account (no password):
+1. Start **MySQL** in the XAMPP Control Panel.
+2. Create an empty database called `soundwave` in phpMyAdmin
+   (`http://localhost/phpmyadmin`), using `utf8mb4_unicode_ci`.
+3. Copy `.env.example` to `.env.local`. The default URL is suitable for a
+   standard local XAMPP installation with `root` and no password. Replace
+   `JWT_SECRET` with a random secret of at least 32 characters.
+4. In PowerShell, from this folder:
 
-```powershell
-$env:JAVA_HOME = (Split-Path (Split-Path (Get-Command java).Source -Parent) -Parent)
-$env:DB_URL = "jdbc:mysql://localhost:3306/soundwave?serverTimezone=UTC"
-$env:DB_USERNAME = "root"
-$env:DB_PASSWORD = ""
-$env:JWT_SECRET = "replace-this-with-a-long-random-secret"
-.\mvnw.cmd -pl backend spring-boot:run
-```
+   ```powershell
+   npm install
+   npm run db:setup
+   npm run db:seed
+   npm run dev
+   ```
 
-If your MySQL account uses a password, set `DB_PASSWORD` to that password.
-The default credentials and JDBC URL can also be changed in
-`backend/src/main/resources/application.yml`.
+5. Open `http://localhost:3000`.
 
-Flyway creates the initial schema on startup. API documentation is available at
-`http://localhost:8080/swagger-ui.html`.
+The development server must remain running while you use the app. For a
+production build, use `npm run build` then `npm run start`.
 
-## Start the JavaFX client
+## Features
 
-With the API running:
+- Responsive web player and browse/search catalogue.
+- Account registration/login with hashed passwords and HTTP-only JWT cookie.
+- Favorites and personal playlists.
+- Listening history and listening statistics.
+- MySQL schema setup and sample catalogue seed script.
 
-```powershell
-.\mvnw.cmd -pl desktop javafx:run
-```
+The initial sample catalogue references externally hosted preview audio. Replace
+those URLs with audio you have permission to stream. Catalogue administration,
+uploads, and a production deployment are not included in this first web version.
 
-The client connects to `http://localhost:8080` by default. Override it with
-`-Dsoundwave.api.base-url=https://your-api-host`.
+## Design
 
-In IntelliJ IDEA, choose **Open**, select this folder (or its root `pom.xml`),
-and import it as a Maven project. Set the project SDK to JDK 21 or newer. Start
-the API first, then run the desktop command in a second terminal.
-
-## Initial API
-
-- `POST /api/auth/register` and `POST /api/auth/login`
-- `GET /api/music` and `GET /api/music?q=search-term`
-- Authenticated library routes under `/api/me` for playlists, favorites,
-  listening history and listening statistics.
-
-The catalogue stores audio URLs rather than distributing music files. Supply
-audio URLs that you have permission to use.
-
-## Project layout
-
-```text
-backend/src/main/java/com/soundwave/api/
-  config/ security/ controllers/ dto/ entities/ repositories/ services/
-desktop/src/main/java/com/soundwave/desktop/
-  controllers/ models/ services/
-desktop/src/main/resources/com/soundwave/desktop/views/
-```
-
-## Roadmap
-
-1. Authentication, database schema and catalogue (current foundation).
-2. JavaFX audio playback and catalogue search.
-3. Playlists and favorites.
-4. Listening history and user statistics.
-5. Automated tests, Docker and deployment.
+The interface uses a quiet ink, warm-paper and muted-sage palette, restrained
+corners, a responsive layout and a persistent player bar. No external imagery
+or copyrighted tracks are bundled.
