@@ -1,0 +1,85 @@
+.root {
+    -fx-font-family: "Segoe UI", sans-serif;
+    -fx-font-size: 14px;
+    -fx-background-color: #f4f6f9;
+    -fx-text-fill: #1d2939;
+}
+
+.app-shell {
+    -fx-background-color: #f4f6f9;
+}
+
+.eyebrow {
+    -fx-fill: #3974b8;
+    -fx-font-size: 11px;
+    -fx-font-weight: bold;
+    -fx-letter-spacing: 2px;
+}
+
+.page-title {
+    -fx-font-size: 25px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #172b4d;
+}
+
+.section-title {
+    -fx-font-size: 20px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #172b4d;
+}
+
+.status, .muted {
+    -fx-text-fill: #68778b;
+}
+
+.sign-in-panel, .player-bar {
+    -fx-background-color: white;
+    -fx-background-radius: 8px;
+    -fx-border-color: #dfe5ec;
+    -fx-border-radius: 8px;
+    -fx-padding: 20px;
+}
+
+.text-field, .password-field {
+    -fx-background-color: white;
+    -fx-border-color: #d1d9e3;
+    -fx-border-radius: 4px;
+    -fx-background-radius: 4px;
+    -fx-padding: 10px;
+}
+
+.button {
+    -fx-cursor: hand;
+    -fx-background-radius: 4px;
+    -fx-padding: 10px 16px;
+    -fx-font-weight: bold;
+}
+
+.primary-button {
+    -fx-background-color: #17365d;
+    -fx-text-fill: white;
+}
+
+.primary-button:hover {
+    -fx-background-color: #244b79;
+}
+
+.secondary-button {
+    -fx-background-color: #e8edf4;
+    -fx-text-fill: #243b5a;
+}
+
+.table-view {
+    -fx-background-color: white;
+    -fx-border-color: #dfe5ec;
+    -fx-border-radius: 6px;
+}
+
+.table-view .column-header-background {
+    -fx-background-color: #eaf0f6;
+}
+
+.player-title {
+    -fx-font-weight: bold;
+    -fx-text-fill: #243b5a;
+}

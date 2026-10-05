@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.PasswordField?>
+<?import javafx.scene.control.TableColumn?>
+<?import javafx.scene.control.TableView?>
+<?import javafx.scene.control.TextField?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.Priority?>
+<?import javafx.scene.layout.VBox?>
+<?import javafx.scene.text.Text?>
+
+<VBox xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1"
+      fx:controller="com.soundwave.desktop.controllers.MainController"
+      spacing="18" styleClass="app-shell">
+  <padding><Insets top="28" right="36" bottom="28" left="36"/></padding>
+  <HBox alignment="CENTER_LEFT" spacing="12">
+    <VBox spacing="3" HBox.hgrow="ALWAYS">
+      <Text text="SOUNDWAVE" styleClass="eyebrow"/>
+      <Label text="Votre musique, votre espace." styleClass="page-title"/>
+    </VBox>
+    <Label fx:id="statusLabel" text="Connectez-vous pour commencer." styleClass="status"/>
+  </HBox>
+
+  <VBox fx:id="signInPanel" spacing="12" maxWidth="480" styleClass="sign-in-panel">
+    <Label text="Bienvenue" styleClass="section-title"/>
+    <TextField fx:id="displayNameField" promptText="Nom affiché (requis pour créer un compte)"/>
+    <TextField fx:id="emailField" promptText="Adresse e-mail" />
+    <PasswordField fx:id="passwordField" promptText="Mot de passe (8 caractères minimum)"/>
+    <HBox spacing="10">
+      <Button text="Se connecter" onAction="#handleLogin" styleClass="primary-button"/>
+      <Button text="Créer un compte" onAction="#handleRegister" styleClass="secondary-button"/>
+    </HBox>
+    <Label text="L’API doit être démarrée pour se connecter." styleClass="muted"/>
+  </VBox>
+
+  <VBox fx:id="libraryPanel" spacing="14" visible="false" managed="false" VBox.vgrow="ALWAYS">
+    <HBox spacing="10">
+      <TextField fx:id="searchField" promptText="Rechercher un titre, un album ou un artiste"
+                 onAction="#searchMusic" HBox.hgrow="ALWAYS"/>
+      <Button text="Rechercher" onAction="#searchMusic" styleClass="primary-button"/>
+    </HBox>
+    <TableView fx:id="musicTable" VBox.vgrow="ALWAYS">
+      <columns>
+        <TableColumn fx:id="titleColumn" text="Titre" prefWidth="300"/>
+        <TableColumn fx:id="artistColumn" text="Artiste" prefWidth="220"/>
+        <TableColumn fx:id="albumColumn" text="Album" prefWidth="260"/>
+      </columns>
+    </TableView>
+    <HBox alignment="CENTER_LEFT" spacing="14" styleClass="player-bar">
+      <Button fx:id="playButton" text="Écouter la sélection" onAction="#togglePlayback"
+              styleClass="primary-button"/>
+      <Label fx:id="playerLabel" text="Aucun titre en lecture" styleClass="player-title"/>
+    </HBox>
+  </VBox>
+</VBox>
