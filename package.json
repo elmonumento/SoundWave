@@ -8,8 +8,7 @@
     "start": "next start",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
-    "db:setup": "tsx scripts/setup-db.ts",
-    "db:seed": "tsx scripts/seed.ts"
+    "db:setup": "tsx scripts/setup-db.ts"
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",

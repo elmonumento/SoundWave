@@ -16,16 +16,18 @@ Drizzle ORM and the MySQL server included with XAMPP.
 3. Copy `.env.example` to `.env.local`. The default URL is suitable for a
    standard local XAMPP installation with `root` and no password. Replace
    `JWT_SECRET` with a random secret of at least 32 characters.
-4. In PowerShell, from this folder:
+4. Create an app at the [Spotify Developer Dashboard](https://developer.spotify.com/dashboard),
+   then copy its client ID and client secret into `SPOTIFY_CLIENT_ID` and
+   `SPOTIFY_CLIENT_SECRET` in `.env.local`. Never expose or commit the client secret.
+5. In PowerShell, from this folder:
 
    ```powershell
    npm install
    npm run db:setup
-   npm run db:seed
    npm run dev
    ```
 
-5. Open `http://localhost:3000`.
+6. Open `http://localhost:3000`.
 
 The development server must remain running while you use the app. For a
 production build, use `npm run build` then `npm run start`.
@@ -36,11 +38,16 @@ production build, use `npm run build` then `npm run start`.
 - Account registration/login with hashed passwords and HTTP-only JWT cookie.
 - Favorites and personal playlists.
 - Listening history and listening statistics.
-- MySQL schema setup and sample catalogue seed script.
+- MySQL schema setup. The catalogue starts empty so only real, authorized listening sources are added.
+- Spotify track search with official embedded playback and links back to Spotify.
+- A Spotify album embed can be shared directly without enabling Spotify API search.
 
-The initial sample catalogue references externally hosted preview audio. Replace
-those URLs with audio you have permission to stream. Catalogue administration,
-uploads, and a production deployment are not included in this first web version.
+Playback is provided by Spotify's official embed. Users may need to be signed
+in to Spotify, and playback availability depends on their account, location and
+Spotify's terms. Spotify development-mode apps require the app owner to have an
+active Premium subscription for Web API search, and allow only a small allowlist
+of Spotify users. The manually shared album embed does not use the Web API.
+SoundWave does not download or rehost Spotify audio.
 
 ## Design
 

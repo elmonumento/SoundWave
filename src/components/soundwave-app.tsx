@@ -5,6 +5,7 @@ import {
   History, Library, ListMusic, LogIn, Menu, Music2, Pause,
   Play, Plus, Search, SkipBack, SkipForward, Sparkles, Volume2, X,
 } from "lucide-react";
+import Image from "next/image";
 import Link from "next/link";
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
@@ -20,9 +21,19 @@ export type Track = {
   artistName: string;
 };
 
+type SpotifyTrack = {
+  id: string;
+  title: string;
+  artistName: string;
+  albumTitle: string;
+  coverUrl: string | null;
+  durationMs: number;
+  spotifyUrl: string;
+};
+
 type User = { id: number; displayName: string; email: string };
 type Playlist = { id: number; name: string; description: string | null; trackCount: number };
-type View = "home" | "search" | "favorites" | "playlists" | "history" | "statistics";
+type View = "home" | "search" | "playlistTracks" | "favorites" | "playlists" | "history" | "statistics";
 type AuthMode = "login" | "register";
 
 const views: { id: View; label: string; icon: typeof Music2 }[] = [
@@ -55,7 +66,11 @@ async function responseError(response: Response) {
 
 export function SoundWaveApp({ initialTracks }: { initialTracks: Track[] }) {
   const [tracks] = useState(initialTracks);
-  const [searchResults, setSearchResults] = useState<Track[]>(initialTracks);
+  const [searchResults, setSearchResults] = useState<SpotifyTrack[]>([]);
+  const [playlistTracks, setPlaylistTracks] = useState<Track[]>([]);
+  const [activePlaylistName, setActivePlaylistName] = useState("");
+  const [selectedSpotifyTrack, setSelectedSpotifyTrack] = useState<SpotifyTrack | null>(null);
+  const [searchError, setSearchError] = useState("");
   const [view, setView] = useState<View>("home");
   const [user, setUser] = useState<User | null>(null);
   const [favorites, setFavorites] = useState<number[]>([]);
@@ -73,6 +88,7 @@ export function SoundWaveApp({ initialTracks }: { initialTracks: Track[] }) {
   const [loading, setLoading] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const searchRequestId = useRef(0);
 
   const announce = useCallback((message: string) => {
     setNotice(message);
@@ -131,29 +147,61 @@ export function SoundWaveApp({ initialTracks }: { initialTracks: Track[] }) {
   };
 
   const runSearch = useCallback(async (query: string) => {
+    const requestId = ++searchRequestId.current;
+    if (query.trim().length < 2) {
+      setSearchResults([]);
+      setSearchError("");
+      setLoading(false);
+      setView("search");
+      return;
+    }
+
     setLoading(true);
+    setSearchError("");
+    setView("search");
     try {
-      const response = await fetch(`/api/music?q=${encodeURIComponent(query)}`);
+      const response = await fetch(`/api/spotify/search?q=${encodeURIComponent(query.trim())}`);
       if (!response.ok) throw new Error(await responseError(response));
       const data = await response.json();
-      setSearchResults(data.tracks);
-      setView("search");
+      if (requestId === searchRequestId.current) setSearchResults(data.tracks);
     } catch (error) {
-      announce(error instanceof Error ? error.message : "La recherche a échoué.");
+      if (requestId === searchRequestId.current) {
+        setSearchError(error instanceof Error ? error.message : "La recherche Spotify a échoué.");
+      }
     } finally {
-      setLoading(false);
+      if (requestId === searchRequestId.current) setLoading(false);
     }
-  }, [announce]);
+  }, []);
 
   const onSearchChange = (value: string) => {
     setSearch(value);
+    setView("search");
+    setSearchError("");
     if (searchTimer.current) clearTimeout(searchTimer.current);
-    searchTimer.current = setTimeout(() => void runSearch(value), 240);
+    if (value.trim().length < 2) {
+      ++searchRequestId.current;
+      setSearchResults([]);
+      setLoading(false);
+      return;
+    }
+    searchTimer.current = setTimeout(() => void runSearch(value), 400);
+  };
+
+  useEffect(() => () => {
+    if (searchTimer.current) clearTimeout(searchTimer.current);
+  }, []);
+
+  const selectSpotifyTrack = (track: SpotifyTrack) => {
+    audioRef.current?.pause();
+    setCurrentTrack(null);
+    setIsPlaying(false);
+    setSelectedSpotifyTrack(track);
   };
 
   const playTrack = async (track: Track) => {
     const audio = audioRef.current;
     if (!audio) return;
+    setSelectedSpotifyTrack(null);
     if (currentTrack?.id === track.id) {
       if (audio.paused) {
         await audio.play().catch(() => announce("Ce fichier audio ne peut pas être lu."));
@@ -263,11 +311,11 @@ export function SoundWaveApp({ initialTracks }: { initialTracks: Track[] }) {
   };
 
   return (
-    <div className="app-frame">
+    <div className={`app-frame ${selectedSpotifyTrack ? "app-frame-spotify" : ""}`}>
       <aside className={`sidebar ${sidebarOpen ? "sidebar-open" : ""}`}>
         <Link className="brand" href="/" onClick={() => setActiveView("home")}>
-          <span className="brand-mark"><AudioLines size={19} strokeWidth={2.2} /></span>
-          <span>soundwave<span className="brand-period">.</span></span>
+          <span className="brand-mark"><Image src="/soundwave-mark.svg" alt="" width={42} height={42} priority /></span>
+          <span className="brand-wordmark"><span>Sound</span><span>Wave</span></span>
         </Link>
 
         <div className="side-caption">ESPACE MUSICAL</div>
@@ -328,10 +376,10 @@ export function SoundWaveApp({ initialTracks }: { initialTracks: Track[] }) {
             <button className="round-control" aria-label="Retour" onClick={() => setActiveView("home")}><ArrowLeft size={16} /></button>
             <button className="round-control" aria-label="Explorer" onClick={() => setActiveView("search")}><ArrowRight size={16} /></button>
           </div>
-          <label className="search-box">
+          <label className="search-box" aria-label="Rechercher un titre sur Spotify">
             <Search size={17} />
-            <input value={search} onChange={(event) => onSearchChange(event.target.value)} placeholder="Rechercher un titre, un artiste, un album" />
-            {search && <button className="search-clear" aria-label="Effacer la recherche" onClick={() => { setSearch(""); void runSearch(""); }}><X size={15} /></button>}
+            <input value={search} onFocus={() => setView("search")} onChange={(event) => onSearchChange(event.target.value)} placeholder="Rechercher sur Spotify…" />
+            {search && <button type="button" className="search-clear" aria-label="Effacer la recherche" onClick={() => { setSearch(""); void runSearch(""); }}><X size={15} /></button>}
             {!search && <kbd>⌘ K</kbd>}
           </label>
           <div className="topbar-actions">
@@ -348,11 +396,11 @@ export function SoundWaveApp({ initialTracks }: { initialTracks: Track[] }) {
                 <div>
                   <p className="eyebrow">LUNDI 5 OCTOBRE · TON ESPACE MUSICAL</p>
                   <h1>La musique trouve<br /><span>sa place ici.</span></h1>
-                  <p className="welcome-copy">Un endroit calme pour explorer, écouter et retrouver les morceaux qui t’accompagnent.</p>
+                  <p className="welcome-copy">Recherche dans le catalogue Spotify et lance l’écoute depuis son lecteur officiel, directement ici.</p>
                 </div>
                 <div className="hero-art" aria-label="Illustration abstraite d'un disque">
                   <div className="art-index">COLLECTION<br />NO. 01</div>
-                  <div className="record-disc"><div className="record-label"><AudioLines size={25} /></div></div>
+                  <div className="record-disc"><div className="record-label"><Image src="/soundwave-mark.svg" alt="Logo SoundWave" width={38} height={38} /></div></div>
                   <div className="art-meta"><span>UNE ÉCOUTE À LA FOIS</span><span>VOL. 01 / 2026</span></div>
                 </div>
               </section>
@@ -368,10 +416,11 @@ export function SoundWaveApp({ initialTracks }: { initialTracks: Track[] }) {
                   <span className="quick-card-icon"><History size={17} /></span><span><strong>Reprendre l’écoute</strong><small>Retrouve tes derniers titres</small></span><ArrowRight className="quick-arrow" size={17} />
                 </button>
               </section>
+              <SpotifyAlbumFeature />
               <section className="music-section">
                 <div className="section-heading">
-                  <div><p className="eyebrow">UNE SÉLECTION POUR COMMENCER</p><h2>À découvrir</h2></div>
-                  <button className="text-action" onClick={() => setActiveView("search")}>Tout explorer <ArrowRight size={15} /></button>
+                  <div><p className="eyebrow">TON ESPACE PERSONNEL</p><h2>Ta bibliothèque</h2></div>
+                  <button className="text-action" onClick={() => setActiveView("search")}>Rechercher sur Spotify <ArrowRight size={15} /></button>
                 </div>
                 <TrackTable tracks={tracks.slice(0, 8)} currentTrack={currentTrack} isPlaying={isPlaying} favorites={favorites} onPlay={playTrack} onFavorite={toggleFavorite} onAddToPlaylist={addToPlaylist} />
               </section>
@@ -382,9 +431,9 @@ export function SoundWaveApp({ initialTracks }: { initialTracks: Track[] }) {
             <section className="library-view">
               <div className="library-heading">
                 <div>
-                  <p className="eyebrow">{view === "search" ? "CATALOGUE SOUNDWAVE" : "TON ESPACE PERSONNEL"}</p>
-                  <h1>{view === "search" ? "Explorer" : view === "favorites" ? "Tes favoris" : view === "playlists" ? "Tes playlists" : view === "history" ? "Historique" : "Mon écoute"}</h1>
-                  <p>{view === "search" ? "Prends le temps de trouver le prochain morceau." : "Une collection qui se construit au fil des écoutes."}</p>
+                  <p className="eyebrow">{view === "search" ? "CATALOGUE SPOTIFY" : "TON ESPACE PERSONNEL"}</p>
+                  <h1>{view === "search" ? "Explorer" : view === "playlistTracks" ? activePlaylistName : view === "favorites" ? "Tes favoris" : view === "playlists" ? "Tes playlists" : view === "history" ? "Historique" : "Mon écoute"}</h1>
+                  <p>{view === "search" ? "Les résultats viennent de Spotify. La lecture se fait dans son lecteur officiel." : view === "playlistTracks" ? "Les morceaux de cette playlist SoundWave." : "Une collection qui se construit au fil des écoutes."}</p>
                 </div>
                 {view === "playlists" && user && <button className="signup-button" onClick={() => setPlaylistDialog(true)}><Plus size={16} /> Nouvelle playlist</button>}
                 {view === "statistics" && <span className="library-feature-icon"><Activity size={24} /></span>}
@@ -395,23 +444,28 @@ export function SoundWaveApp({ initialTracks }: { initialTracks: Track[] }) {
                 : view === "playlists"
                   ? <PlaylistPanel playlists={playlists} user={user} tracks={tracks} currentTrack={currentTrack} isPlaying={isPlaying} onPlay={playTrack} onSelectPlaylist={(playlist) => {
                     void fetch(`/api/me/playlists/${playlist.id}/tracks`).then((response) => response.json()).then((data) => {
-                      setSearchResults(data.tracks);
-                      setView("search");
+                      setPlaylistTracks(data.tracks);
+                      setActivePlaylistName(playlist.name);
+                      setView("playlistTracks");
                     }).catch(() => announce("Cette playlist n’a pas pu être ouverte."));
                   }} />
-                  : <TrackTable tracks={view === "search" ? searchResults : visibleTracks} currentTrack={currentTrack} isPlaying={isPlaying} favorites={favorites} loading={loading} onPlay={playTrack} onFavorite={toggleFavorite} onAddToPlaylist={addToPlaylist} />}
+                  : view === "search"
+                    ? <SpotifyResults tracks={searchResults} query={search} error={searchError} loading={loading} selectedId={selectedSpotifyTrack?.id ?? null} onSelect={selectSpotifyTrack} />
+                    : <TrackTable tracks={view === "playlistTracks" ? playlistTracks : visibleTracks} currentTrack={currentTrack} isPlaying={isPlaying} favorites={favorites} onPlay={playTrack} onFavorite={toggleFavorite} onAddToPlaylist={addToPlaylist} />}
             </section>
           )}
         </div>
       </main>
 
-      <PlayerBar track={currentTrack} playing={isPlaying} progress={progress} duration={duration} onToggle={() => currentTrack && void playTrack(currentTrack)} onPrevious={playPrevious} onNext={playNext} onSeek={(value) => {
-        const audio = audioRef.current;
-        if (audio && Number.isFinite(audio.duration)) {
-          audio.currentTime = value;
-          setProgress(value);
-        }
-      }} />
+      {selectedSpotifyTrack
+        ? <SpotifyPlayer track={selectedSpotifyTrack} />
+        : <PlayerBar track={currentTrack} playing={isPlaying} progress={progress} duration={duration} onToggle={() => currentTrack && void playTrack(currentTrack)} onPrevious={playPrevious} onNext={playNext} onSeek={(value) => {
+          const audio = audioRef.current;
+          if (audio && Number.isFinite(audio.duration)) {
+            audio.currentTime = value;
+            setProgress(value);
+          }
+        }} />}
       <audio
         ref={audioRef}
         onTimeUpdate={(event) => setProgress(event.currentTarget.currentTime)}
@@ -436,6 +490,121 @@ export function SoundWaveApp({ initialTracks }: { initialTracks: Track[] }) {
   );
 }
 
+const spotifyAlbums = [
+  { id: "7gGJ9rNtigRF53dsFo48Wp", title: "Welcome to O'Block" },
+  { id: "6ciIG1XKTlVIn0Yl8rvsce", title: "Almost Healed" },
+  { id: "6lb9q7QZwjMj9EE7M664sK", title: "The Voice (Deluxe)" },
+  { id: "0s8hpk11n5gpgAR0Sxth8S", title: "FLOATER" },
+  { id: "7hcmFVB5Pclui5v2kXDePS", title: "FREELYM" },
+  { id: "2jkrBfnQoV4eDTaoXWnVhg", title: "MASA" },
+  { id: "1nzUj7VkiaytMmf2KrhK2L", title: "AI YoungBoy 2" },
+  { id: "0LZndJKxVb0oY3qGUpxqQQ", title: "Marcory Trap Shit REEDITION" },
+  { id: "2P3c2J4NJzrksbKN2WIuRd", title: "NOUCHI TRAP VOL 1" },
+  { id: "6MPNZug9oqtpRulDoDyZOY", title: "WELCOME TO MY HOOD" },
+];
+
+function SpotifyAlbumFeature() {
+  return (
+    <section className="spotify-album-section" aria-labelledby="spotify-album-heading">
+      <div className="section-heading">
+        <div>
+          <p className="eyebrow">ÉCOUTE VIA LE LECTEUR OFFICIEL</p>
+          <h2 id="spotify-album-heading">Albums à écouter</h2>
+        </div>
+        <span className="spotify-album-count">{spotifyAlbums.length} albums</span>
+      </div>
+      <p className="spotify-album-copy">Sélection d’albums partagés par toi · lecture assurée par Spotify.</p>
+      <div className="spotify-album-grid">
+        {spotifyAlbums.map((album) => (
+          <article className="spotify-album-card" key={album.id}>
+            <div className="spotify-album-card-heading">
+              <h3>{album.title}</h3>
+              <a
+                className="spotify-album-link"
+                href={`https://open.spotify.com/intl-fr/album/${album.id}`}
+                target="_blank"
+                rel="noreferrer"
+                aria-label={`Ouvrir ${album.title} sur Spotify`}
+              >
+                <ArrowRight size={15} />
+              </a>
+            </div>
+            <iframe
+              className="spotify-album-embed"
+              title={`Lecteur Spotify officiel — ${album.title}`}
+              src={`https://open.spotify.com/embed/album/${album.id}?utm_source=generator`}
+              allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
+              loading="lazy"
+            />
+          </article>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function SpotifyResults({
+  tracks, query, error, loading, selectedId, onSelect,
+}: {
+  tracks: SpotifyTrack[];
+  query: string;
+  error: string;
+  loading: boolean;
+  selectedId: string | null;
+  onSelect: (track: SpotifyTrack) => void;
+}) {
+  if (loading) return <div className="empty-state"><span className="loading-mark" /><p>Recherche dans Spotify…</p></div>;
+  if (error) return <div className="empty-state" role="alert"><Disc3 size={27} /><strong>Recherche Spotify indisponible</strong><p>{error}</p></div>;
+  if (query.trim().length < 2) return <div className="empty-state"><Search size={27} /><strong>Recherche dans Spotify</strong><p>Saisis au moins deux caractères pour trouver un titre ou un artiste.</p></div>;
+  if (!tracks.length) return <div className="empty-state"><Disc3 size={27} /><strong>Aucun résultat</strong><p>Essaie un autre titre ou nom d’artiste.</p></div>;
+
+  return (
+    <div className="spotify-results">
+      <p className="spotify-attribution">Résultats fournis par Spotify · sélectionne un titre pour ouvrir son lecteur officiel.</p>
+      {tracks.map((track) => (
+        <article className={`spotify-result ${selectedId === track.id ? "spotify-result-selected" : ""}`} key={track.id}>
+          <button className="spotify-result-select" onClick={() => onSelect(track)} aria-label={`Écouter ${track.title} par ${track.artistName} avec le lecteur Spotify`}>
+            <span
+              className="spotify-result-cover"
+              role="img"
+              aria-label={`Pochette de l’album ${track.albumTitle}`}
+              style={track.coverUrl ? { backgroundImage: `url("${track.coverUrl}")` } : undefined}
+            >
+              {!track.coverUrl && <Disc3 size={20} />}
+            </span>
+            <span className="spotify-result-copy">
+              <strong>{track.title}</strong>
+              <small>{track.artistName} · {track.albumTitle}</small>
+            </span>
+            <span className="spotify-result-duration">{formatTime(Math.floor(track.durationMs / 1000))}</span>
+          </button>
+          <a className="spotify-result-link" href={track.spotifyUrl} target="_blank" rel="noreferrer">
+            Spotify <ArrowRight size={13} />
+          </a>
+        </article>
+      ))}
+    </div>
+  );
+}
+
+function SpotifyPlayer({ track }: { track: SpotifyTrack }) {
+  return (
+    <footer className="spotify-player-bar">
+      <div className="spotify-player-heading">
+        <span><span className="spotify-indicator" /> Lecteur officiel Spotify</span>
+        <a href={track.spotifyUrl} target="_blank" rel="noreferrer">Ouvrir dans Spotify <ArrowRight size={13} /></a>
+      </div>
+      <iframe
+        key={track.id}
+        title={`Lecteur Spotify : ${track.title} — ${track.artistName}`}
+        src={`https://open.spotify.com/embed/track/${encodeURIComponent(track.id)}?utm_source=generator`}
+        allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
+        loading="lazy"
+      />
+    </footer>
+  );
+}
+
 function TrackTable({
   tracks, currentTrack, isPlaying, favorites, loading = false, onPlay, onFavorite, onAddToPlaylist,
 }: {
@@ -443,7 +612,7 @@ function TrackTable({
   loading?: boolean; onPlay: (track: Track) => void; onFavorite: (track: Track) => void; onAddToPlaylist: (track: Track) => void;
 }) {
   if (loading) return <div className="empty-state"><span className="loading-mark" /><p>On cherche dans le catalogue…</p></div>;
-  if (!tracks.length) return <div className="empty-state"><Disc3 size={27} /><strong>Pas encore de morceau ici</strong><p>Essaie une recherche ou reviens après avoir ajouté de la musique à la bibliothèque.</p></div>;
+  if (!tracks.length) return <div className="empty-state"><Disc3 size={27} /><strong>Aucun morceau dans cette sélection</strong><p>Utilise la recherche en haut de la page pour trouver des titres et les écouter avec le lecteur officiel Spotify.</p></div>;
 
   return (
     <div className="track-table">
@@ -544,7 +713,7 @@ function AuthDialog({
     <div className="dialog-backdrop" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
       <section className="auth-dialog" role="dialog" aria-modal="true" aria-labelledby="auth-title">
         <button className="dialog-close icon-button" aria-label="Fermer" onClick={onClose}><X size={18} /></button>
-        <div className="dialog-brand"><span className="brand-mark"><AudioLines size={19} /></span></div>
+        <div className="dialog-brand"><span className="brand-mark"><Image src="/soundwave-mark.svg" alt="SoundWave" width={42} height={42} /></span></div>
         <p className="eyebrow">TON ESPACE MUSICAL</p>
         <h2 id="auth-title">{mode === "login" ? "Heureux de te revoir." : "Une place pour toi."}</h2>
         <p className="dialog-intro">{mode === "login" ? "Retrouve tes favoris et tes playlists." : "Crée ton compte et compose ta collection."}</p>
